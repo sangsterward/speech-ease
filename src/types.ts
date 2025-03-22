@@ -39,7 +39,7 @@ export interface AppContextType {
   updateSettings: (settings: Partial<AppSettings>) => void;
   toggleEditMode: () => void;
   navigateToPage: (pageId: string) => void;
-  addSubPage: (parentPageId: string, name: string) => void;
+  addSubPage: (parentPageId: string, name: string) => string;
   updateButton: (pageId: string, buttonId: string, updates: Partial<ButtonData>) => void;
   updatePage: (pageId: string, buttons: ButtonData[]) => void;
   resetToDefault: () => void;

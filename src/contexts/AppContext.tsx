@@ -72,7 +72,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const addSubPage = useCallback((parentPageId: string, name: string) => {
-    dispatch({ type: 'ADD_SUB_PAGE', payload: { parentPageId, name } });
+    const newPageId = `page-${Date.now()}`;
+    dispatch({ type: 'ADD_SUB_PAGE', payload: { parentPageId, name, id: newPageId } });
+    return newPageId;
   }, []);
 
   const updateButton = useCallback((pageId: string, buttonId: string, data: Partial<ButtonData>) => {
@@ -116,7 +118,7 @@ type Action =
   | { type: 'UPDATE_PAGE'; payload: { pageId: string; buttons: ButtonData[] } }
   | { type: 'NAVIGATE_TO_PAGE'; payload: string }
   | { type: 'TOGGLE_EDIT_MODE' }
-  | { type: 'ADD_SUB_PAGE'; payload: { parentPageId: string; name: string } }
+  | { type: 'ADD_SUB_PAGE'; payload: { parentPageId: string; name: string; id: string } }
   | { type: 'UPDATE_BUTTON'; payload: { pageId: string; buttonId: string; data: Partial<ButtonData> } }
   | { type: 'RESET_TO_DEFAULT'; payload: AppState };
 
@@ -148,7 +150,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
       };
     case 'ADD_SUB_PAGE':
       const newPage = {
-        id: `page-${Date.now()}`,
+        id: action.payload.id,
         name: action.payload.name,
         buttons: [],
         parentPageId: action.payload.parentPageId,

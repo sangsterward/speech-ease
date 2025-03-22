@@ -6,6 +6,8 @@ import {
   ListItemIcon,
   ListItemText,
   Divider,
+  Box,
+  Chip,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -13,11 +15,14 @@ import {
   Title,
   GridView,
   ArrowBack,
+  Edit as EditIcon,
 } from '@mui/icons-material';
 import { useApp } from '../../contexts/AppContext';
+import { GridSizeDialog } from '../GridSizeDialog/GridSizeDialog';
 
 export const Menu: React.FC = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [showGridDialog, setShowGridDialog] = useState(false);
   const { state, updateSettings, toggleEditMode, navigateToPage } = useApp();
   const open = Boolean(anchorEl);
 
@@ -43,24 +48,17 @@ export const Menu: React.FC = () => {
   };
 
   const handleGridSize = () => {
-    const rows = window.prompt('Enter number of rows:', state.settings.gridSize.rows.toString());
-    if (!rows) return handleClose();
-
-    const columns = window.prompt('Enter number of columns:', state.settings.gridSize.columns.toString());
-    if (!columns) return handleClose();
-
-    const newRows = parseInt(rows);
-    const newColumns = parseInt(columns);
-
-    if (!isNaN(newRows) && !isNaN(newColumns)) {
-      updateSettings({
-        gridSize: {
-          rows: newRows,
-          columns: newColumns,
-        },
-      });
-    }
+    setShowGridDialog(true);
     handleClose();
+  };
+
+  const handleGridSizeSave = (rows: number, columns: number) => {
+    updateSettings({
+      gridSize: {
+        rows,
+        columns,
+      },
+    });
   };
 
   const handleBack = () => {
@@ -73,17 +71,33 @@ export const Menu: React.FC = () => {
 
   return (
     <>
-      <IconButton
-        onClick={handleClick}
-        aria-controls={open ? 'menu-popup' : undefined}
-        aria-haspopup="true"
-        aria-expanded={open ? 'true' : undefined}
-        aria-label="open menu"
-        color="inherit"
-        sx={{ position: 'fixed', top: 16, right: 16, zIndex: 1100 }}
-      >
-        <MenuIcon />
-      </IconButton>
+      <Box sx={{ position: 'fixed', top: 16, right: 16, zIndex: 1100, display: 'flex', alignItems: 'center', gap: 1 }}>
+        {state.isEditMode && (
+          <Chip
+            icon={<EditIcon />}
+            label="Edit Mode"
+            color="primary"
+            size="small"
+            sx={{ mr: 1 }}
+          />
+        )}
+        <IconButton
+          onClick={handleClick}
+          aria-controls={open ? 'menu-popup' : undefined}
+          aria-haspopup="true"
+          aria-expanded={open ? 'true' : undefined}
+          aria-label="open menu"
+          color={state.isEditMode ? "primary" : "inherit"}
+          sx={{
+            bgcolor: state.isEditMode ? 'primary.light' : 'transparent',
+            '&:hover': {
+              bgcolor: state.isEditMode ? 'primary.main' : 'action.hover',
+            },
+          }}
+        >
+          <MenuIcon />
+        </IconButton>
+      </Box>
       <MuiMenu
         id="menu-popup"
         anchorEl={anchorEl}
@@ -91,6 +105,9 @@ export const Menu: React.FC = () => {
         onClose={handleClose}
         MenuListProps={{
           'aria-labelledby': 'menu-button',
+          sx: {
+            bgcolor: state.isEditMode ? 'primary.light' : 'background.paper',
+          },
         }}
       >
         <MenuItem onClick={handleEditMode}>
@@ -127,6 +144,14 @@ export const Menu: React.FC = () => {
           </>
         )}
       </MuiMenu>
+
+      <GridSizeDialog
+        open={showGridDialog}
+        onClose={() => setShowGridDialog(false)}
+        onSave={handleGridSizeSave}
+        currentRows={state.settings.gridSize.rows}
+        currentColumns={state.settings.gridSize.columns}
+      />
     </>
   );
 }; 

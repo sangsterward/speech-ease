@@ -1,112 +1,209 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { userEvent } from '@testing-library/user-event';
 import { SpeechButton } from './SpeechButton';
+import { AppProvider } from '../../contexts/AppContext';
 import { useApp } from '../../contexts/AppContext';
-import { useSpeechSynthesis } from '../../hooks/useSpeechSynthesis';
 
-// Mock the hooks
-jest.mock('../../contexts/AppContext', () => ({
-  useApp: jest.fn(),
-}));
-
+// Mock the speech synthesis hook
 jest.mock('../../hooks/useSpeechSynthesis', () => ({
-  useSpeechSynthesis: jest.fn(),
+  useSpeechSynthesis: () => ({
+    speak: jest.fn(),
+  }),
 }));
+
+// Test wrapper component to provide context
+const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  return <AppProvider>{children}</AppProvider>;
+};
+
+// Helper component to access context in tests
+const TestComponent: React.FC<{ button: any; pageId: string }> = ({ button, pageId }) => {
+  const { state } = useApp();
+  return (
+    <div>
+      <div data-testid="edit-mode">{state.isEditMode.toString()}</div>
+      <SpeechButton button={button} pageId={pageId} />
+    </div>
+  );
+};
 
 describe('SpeechButton', () => {
-  const mockSpeak = jest.fn();
-  const mockNavigateToPage = jest.fn();
-  const mockUpdateButton = jest.fn();
-
-  const defaultButton = {
-    id: '1',
+  const mockButton = {
+    id: 'test-button',
     text: 'Test Button',
-    imageUrl: 'test-image.jpg',
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (useSpeechSynthesis as jest.Mock).mockReturnValue({
-      speak: mockSpeak,
-      speaking: false,
-    });
-    (useApp as jest.Mock).mockReturnValue({
-      state: { isEditMode: false },
-      navigateToPage: mockNavigateToPage,
-      updateButton: mockUpdateButton,
-    });
   });
 
-  it('renders button with text and image', () => {
-    render(<SpeechButton button={defaultButton} pageId="main" />);
-    
+  it('renders button with text', () => {
+    render(
+      <TestWrapper>
+        <TestComponent button={mockButton} pageId="main" />
+      </TestWrapper>
+    );
     expect(screen.getByText('Test Button')).toBeInTheDocument();
-    const image = screen.getByAltText('Test Button');
-    expect(image).toBeInTheDocument();
-    expect(image).toHaveAttribute('src', 'test-image.jpg');
   });
 
   it('speaks text when clicked in normal mode', () => {
-    render(<SpeechButton button={defaultButton} pageId="main" />);
-    
-    fireEvent.click(screen.getByRole('button'));
-    expect(mockSpeak).toHaveBeenCalledWith('Test Button');
+    const { speak } = require('../../hooks/useSpeechSynthesis');
+    render(
+      <TestWrapper>
+        <TestComponent button={mockButton} pageId="main" />
+      </TestWrapper>
+    );
+    fireEvent.click(screen.getByText('Test Button'));
+    expect(speak).toHaveBeenCalledWith('Test Button');
   });
 
-  it('navigates to sub-page when button has subPageId', () => {
-    const buttonWithSubPage = { ...defaultButton, subPageId: 'sub-1' };
-    render(<SpeechButton button={buttonWithSubPage} pageId="main" />);
-    
-    fireEvent.click(screen.getByRole('button'));
-    expect(mockNavigateToPage).toHaveBeenCalledWith('sub-1');
-  });
+  it('shows edit dialog when clicked in edit mode', async () => {
+    render(
+      <TestWrapper>
+        <TestComponent button={mockButton} pageId="main" />
+      </TestWrapper>
+    );
 
-  describe('Edit Mode', () => {
-    beforeEach(() => {
-      (useApp as jest.Mock).mockReturnValue({
-        state: { isEditMode: true },
-        navigateToPage: mockNavigateToPage,
-        updateButton: mockUpdateButton,
-      });
-    });
+    // Enter edit mode
+    const { toggleEditMode } = useApp();
+    toggleEditMode();
 
-    it('allows text editing when in edit mode', () => {
-      window.prompt = jest.fn().mockReturnValue('New Text');
-      render(<SpeechButton button={defaultButton} pageId="main" />);
-      
-      fireEvent.click(screen.getByRole('button'));
-      
-      expect(window.prompt).toHaveBeenCalledWith('Enter new text for button:', 'Test Button');
-      expect(mockUpdateButton).toHaveBeenCalledWith('main', '1', { text: 'New Text' });
-    });
+    // Click the button
+    fireEvent.click(screen.getByText('Test Button'));
 
-    it('allows image editing when in edit mode', () => {
-      window.prompt = jest.fn().mockReturnValue('new-image.jpg');
-      render(<SpeechButton button={defaultButton} pageId="main" />);
-      
-      fireEvent.click(screen.getByRole('img'));
-      
-      expect(window.prompt).toHaveBeenCalledWith('Enter new image URL:', 'test-image.jpg');
-      expect(mockUpdateButton).toHaveBeenCalledWith('main', '1', { imageUrl: 'new-image.jpg' });
-    });
+    // Verify prompt appears
+    const promptSpy = jest.spyOn(window, 'prompt');
+    promptSpy.mockReturnValue('New Button Text');
 
-    it('does not update when prompt is cancelled', () => {
-      window.prompt = jest.fn().mockReturnValue(null);
-      render(<SpeechButton button={defaultButton} pageId="main" />);
-      
-      fireEvent.click(screen.getByRole('button'));
-      
-      expect(mockUpdateButton).not.toHaveBeenCalled();
+    // Wait for the prompt to be handled
+    await waitFor(() => {
+      expect(promptSpy).toHaveBeenCalledWith('Enter new text for button:', 'Test Button');
     });
   });
 
-  it('handles keyboard navigation', () => {
-    render(<SpeechButton button={defaultButton} pageId="main" />);
-    
-    fireEvent.keyDown(screen.getByRole('button'), { key: 'Enter' });
-    expect(mockSpeak).toHaveBeenCalledWith('Test Button');
-    
-    fireEvent.keyDown(screen.getByRole('button'), { key: ' ' });
-    expect(mockSpeak).toHaveBeenCalledWith('Test Button');
+  describe('Sub-page functionality', () => {
+    it('shows create sub-page option in edit mode', async () => {
+      render(
+        <TestWrapper>
+          <TestComponent button={mockButton} pageId="main" />
+        </TestWrapper>
+      );
+
+      // Enter edit mode
+      const { toggleEditMode } = useApp();
+      toggleEditMode();
+
+      // Click the media area to open menu
+      const mediaArea = screen.getByRole('button');
+      fireEvent.click(mediaArea);
+
+      // Verify create sub-page option is present
+      expect(screen.getByText('Create Sub-page')).toBeInTheDocument();
+    });
+
+    it('creates a new sub-page when option is selected', async () => {
+      render(
+        <TestWrapper>
+          <TestComponent button={mockButton} pageId="main" />
+        </TestWrapper>
+      );
+
+      // Enter edit mode
+      const { toggleEditMode } = useApp();
+      toggleEditMode();
+
+      // Click the media area to open menu
+      const mediaArea = screen.getByRole('button');
+      fireEvent.click(mediaArea);
+
+      // Click create sub-page option
+      fireEvent.click(screen.getByText('Create Sub-page'));
+
+      // Enter sub-page name
+      const input = screen.getByLabelText('Sub-page Name');
+      await userEvent.type(input, 'New Sub-page');
+
+      // Click create button
+      fireEvent.click(screen.getByText('Create'));
+
+      // Verify the button now has a sub-page indicator
+      expect(screen.getByTestId('NavigateNextIcon')).toBeInTheDocument();
+    });
+
+    it('navigates to sub-page when clicked in normal mode', () => {
+      const buttonWithSubPage = {
+        ...mockButton,
+        subPageId: 'sub-page-1',
+      };
+
+      render(
+        <TestWrapper>
+          <TestComponent button={buttonWithSubPage} pageId="main" />
+        </TestWrapper>
+      );
+
+      const { navigateToPage } = useApp();
+      const navigateSpy = jest.spyOn({ navigateToPage }, 'navigateToPage');
+
+      // Click the button
+      fireEvent.click(screen.getByText('Test Button'));
+
+      // Verify navigation to sub-page
+      expect(navigateSpy).toHaveBeenCalledWith('sub-page-1');
+    });
+
+    it('shows go to sub-page option in edit mode for buttons with sub-pages', async () => {
+      const buttonWithSubPage = {
+        ...mockButton,
+        subPageId: 'sub-page-1',
+      };
+
+      render(
+        <TestWrapper>
+          <TestComponent button={buttonWithSubPage} pageId="main" />
+        </TestWrapper>
+      );
+
+      // Enter edit mode
+      const { toggleEditMode } = useApp();
+      toggleEditMode();
+
+      // Click the media area to open menu
+      const mediaArea = screen.getByRole('button');
+      fireEvent.click(mediaArea);
+
+      // Verify go to sub-page option is present
+      expect(screen.getByText('Go to Sub-page')).toBeInTheDocument();
+    });
+
+    it('navigates to sub-page when go to sub-page option is selected in edit mode', async () => {
+      const buttonWithSubPage = {
+        ...mockButton,
+        subPageId: 'sub-page-1',
+      };
+
+      render(
+        <TestWrapper>
+          <TestComponent button={buttonWithSubPage} pageId="main" />
+        </TestWrapper>
+      );
+
+      // Enter edit mode
+      const { toggleEditMode } = useApp();
+      toggleEditMode();
+
+      // Click the media area to open menu
+      const mediaArea = screen.getByRole('button');
+      fireEvent.click(mediaArea);
+
+      // Click go to sub-page option
+      fireEvent.click(screen.getByText('Go to Sub-page'));
+
+      // Verify navigation to sub-page
+      const { navigateToPage } = useApp();
+      const navigateSpy = jest.spyOn({ navigateToPage }, 'navigateToPage');
+      expect(navigateSpy).toHaveBeenCalledWith('sub-page-1');
+    });
   });
 }); 

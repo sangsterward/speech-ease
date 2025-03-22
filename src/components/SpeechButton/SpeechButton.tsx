@@ -9,8 +9,14 @@ import {
   ListItemIcon,
   ListItemText,
   Box,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
 } from '@mui/material';
-import { Image, EmojiEmotions } from '@mui/icons-material';
+import { Image, EmojiEmotions, SubdirectoryArrowRight, NavigateNext } from '@mui/icons-material';
 import * as Icons from '@mui/icons-material';
 import { useApp } from '../../contexts/AppContext';
 import { useSpeechSynthesis } from '../../hooks/useSpeechSynthesis';
@@ -31,11 +37,13 @@ interface SpeechButtonProps {
 }
 
 export const SpeechButton: React.FC<SpeechButtonProps> = ({ button, pageId }) => {
-  const { state, updateButton, navigateToPage } = useApp();
+  const { state, updateButton, navigateToPage, addSubPage } = useApp();
   const { speak } = useSpeechSynthesis();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [iconSelectorOpen, setIconSelectorOpen] = useState(false);
   const [imageUploadOpen, setImageUploadOpen] = useState(false);
+  const [subPageDialogOpen, setSubPageDialogOpen] = useState(false);
+  const [subPageName, setSubPageName] = useState('');
 
   const handleClick = () => {
     if (state.isEditMode) {
@@ -73,6 +81,16 @@ export const SpeechButton: React.FC<SpeechButtonProps> = ({ button, pageId }) =>
       iconName,
       imageUrl: undefined 
     });
+  };
+
+  const handleCreateSubPage = () => {
+    if (subPageName.trim()) {
+      const newPageId = addSubPage(pageId, subPageName.trim());
+      updateButton(pageId, button.id, { subPageId: newPageId });
+      setSubPageName('');
+      setSubPageDialogOpen(false);
+      handleMenuClose();
+    }
   };
 
   const renderMedia = () => {
@@ -153,9 +171,14 @@ export const SpeechButton: React.FC<SpeechButtonProps> = ({ button, pageId }) =>
       >
         {renderMedia()}
         <CardContent sx={{ flexGrow: 1, textAlign: 'center', p: 1 }}>
-          <Typography variant="h6" component="div">
-            {button.text}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+            <Typography variant="h6" component="div">
+              {button.text}
+            </Typography>
+            {button.subPageId && (
+              <NavigateNext fontSize="small" color="action" />
+            )}
+          </Box>
         </CardContent>
       </Card>
 
@@ -182,6 +205,28 @@ export const SpeechButton: React.FC<SpeechButtonProps> = ({ button, pageId }) =>
           </ListItemIcon>
           <ListItemText primary="Choose Icon" />
         </MenuItem>
+        {!button.subPageId && (
+          <MenuItem onClick={() => {
+            handleMenuClose();
+            setSubPageDialogOpen(true);
+          }}>
+            <ListItemIcon>
+              <SubdirectoryArrowRight fontSize="small" />
+            </ListItemIcon>
+            <ListItemText primary="Create Sub-page" />
+          </MenuItem>
+        )}
+        {button.subPageId && (
+          <MenuItem onClick={() => {
+            handleMenuClose();
+            navigateToPage(button.subPageId!);
+          }}>
+            <ListItemIcon>
+              <NavigateNext fontSize="small" />
+            </ListItemIcon>
+            <ListItemText primary="Go to Sub-page" />
+          </MenuItem>
+        )}
       </Menu>
 
       <IconSelector
@@ -195,6 +240,26 @@ export const SpeechButton: React.FC<SpeechButtonProps> = ({ button, pageId }) =>
         onClose={() => setImageUploadOpen(false)}
         onImageSelect={handleImageSelect}
       />
+
+      <Dialog open={subPageDialogOpen} onClose={() => setSubPageDialogOpen(false)}>
+        <DialogTitle>Create Sub-page</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Sub-page Name"
+            fullWidth
+            value={subPageName}
+            onChange={(e) => setSubPageName(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSubPageDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleCreateSubPage} variant="contained">
+            Create
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }; 

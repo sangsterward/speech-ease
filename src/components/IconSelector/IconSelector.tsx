@@ -7,6 +7,10 @@ import {
   IconButton,
   TextField,
   InputAdornment,
+  Tooltip,
+  Box,
+  Typography,
+  SvgIconProps,
 } from '@mui/material';
 import * as Icons from '@mui/icons-material';
 import { Search } from '@mui/icons-material';
@@ -29,9 +33,11 @@ export const IconSelector: React.FC<IconSelectorProps> = ({
     (key) => key !== 'default' && typeof Icons[key as keyof typeof Icons] === 'function'
   );
 
-  const filteredIcons = iconNames.filter((name) =>
+  // Get the first matching icon for preview
+  const previewIconName = iconNames.find(name => 
     name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+  const PreviewIcon = previewIconName ? Icons[previewIconName as keyof typeof Icons] as React.ComponentType<SvgIconProps> : null;
 
   const handleSelect = (iconName: string) => {
     onSelect(iconName);
@@ -57,27 +63,57 @@ export const IconSelector: React.FC<IconSelectorProps> = ({
             ),
           }}
         />
+        
+        {/* Preview Section */}
+        {searchTerm && PreviewIcon && (
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 2, 
+              p: 2, 
+              bgcolor: 'action.hover',
+              borderRadius: 1,
+              mb: 2
+            }}
+          >
+            <PreviewIcon sx={{ fontSize: 40 }} />
+            <Typography variant="body1">
+              {previewIconName}
+            </Typography>
+          </Box>
+        )}
+
         <Grid container spacing={1} sx={{ mt: 2, maxHeight: '60vh', overflow: 'auto' }}>
-          {filteredIcons.map((iconName) => {
-            const Icon = Icons[iconName as keyof typeof Icons] as React.ComponentType;
+          {iconNames.map((iconName) => {
+            const Icon = Icons[iconName as keyof typeof Icons] as React.ComponentType<SvgIconProps>;
+            const isMatch = iconName.toLowerCase().includes(searchTerm.toLowerCase());
+            
             return (
               <Grid item key={iconName} xs={2} sm={1}>
-                <IconButton
-                  onClick={() => handleSelect(iconName)}
-                  sx={{
-                    width: '100%',
-                    height: '100%',
-                    aspectRatio: '1',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    '&:hover': {
-                      backgroundColor: 'action.hover',
-                    },
-                  }}
-                >
-                  <Icon />
-                </IconButton>
+                <Tooltip title={iconName} arrow>
+                  <IconButton
+                    onClick={() => handleSelect(iconName)}
+                    aria-label={`Select ${iconName} icon`}
+                    sx={{
+                      width: '100%',
+                      height: '100%',
+                      aspectRatio: '1',
+                      border: '1px solid',
+                      borderColor: isMatch ? 'primary.main' : 'divider',
+                      borderRadius: 1,
+                      bgcolor: isMatch ? 'action.selected' : 'transparent',
+                      '&:hover': {
+                        backgroundColor: 'action.hover',
+                      },
+                    }}
+                  >
+                    <Icon sx={{ 
+                      color: isMatch ? 'primary.main' : 'inherit',
+                      opacity: isMatch ? 1 : 0.5
+                    }} />
+                  </IconButton>
+                </Tooltip>
               </Grid>
             );
           })}

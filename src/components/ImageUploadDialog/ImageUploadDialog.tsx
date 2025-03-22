@@ -9,7 +9,6 @@ import {
   Box,
   Typography,
   Alert,
-  IconButton,
 } from '@mui/material';
 import { CloudUpload, Link as LinkIcon, PhotoCamera } from '@mui/icons-material';
 import { convertImageToBase64, validateImage } from '../../utils/imageUtils';
