@@ -1,0 +1,61 @@
+name: Deploy to S3
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  AWS_REGION: us-east-1
+  S3_BUCKET: speech-ease-app
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to S3
+        run: |
+          # Sync the build directory with S3 bucket
+          aws s3 sync build/ s3://${{ env.S3_BUCKET }} --delete
+          
+          # Set cache control headers for static assets
+          aws s3 cp s3://${{ env.S3_BUCKET }} s3://${{ env.S3_BUCKET }} --recursive \
+            --exclude "*.html" \
+            --cache-control "max-age=31536000,public" \
+            --metadata-directive REPLACE
+
+          # Set cache control headers for HTML files
+          aws s3 cp s3://${{ env.S3_BUCKET }} s3://${{ env.S3_BUCKET }} --recursive \
+            --include "*.html" \
+            --cache-control "no-cache" \
+            --metadata-directive REPLACE
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*" 
